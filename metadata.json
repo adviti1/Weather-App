@@ -1,0 +1,7 @@
+{
+  "name": " SkyCast Pro - Precision Weather Dashboard",
+  "description": "A high-performance weather forecasting application featuring real-time data, 5-day forecasts, geolocation, and a comprehensive city weather directory.",
+  "requestFramePermissions": [
+    "geolocation"
+  ]
+}

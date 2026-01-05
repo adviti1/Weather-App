@@ -5,6 +5,7 @@ import { fetchGeocoding, fetchWeatherData } from './services/weatherService';
 import { WEATHER_ICONS } from './constants';
 import { SkeletonCard, SkeletonForecast } from './components/SkeletonLoader';
 import WeatherTable from './components/WeatherTable';
+import { GoogleGenAI } from "@google/genai";
 
 const App: React.FC = () => {
   const [search, setSearch] = useState('');
@@ -14,6 +15,25 @@ const App: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [unit, setUnit] = useState<Unit>('C');
   const [theme, setTheme] = useState<Theme>('light');
+  const [weatherAdvice, setWeatherAdvice] = useState<string>('Stay updated with SkyCast Pro. Check back regularly for high-precision real-time satellite data.');
+
+  const generateAdvice = useCallback(async (weather: CurrentWeather) => {
+    try {
+      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+      const response = await ai.models.generateContent({
+        model: 'gemini-3-flash-preview',
+        contents: `Give a short, professional, and helpful weather tip for someone in ${weather.city} where the current weather is ${weather.condition}, ${weather.temperature}°C, ${weather.humidity}% humidity, and ${weather.windSpeed}km/h wind speed. Max 20 words.`,
+        config: {
+          systemInstruction: "You are a professional meteorologist giving concise, actionable weather advice.",
+        }
+      });
+      if (response.text) {
+        setWeatherAdvice(response.text.trim());
+      }
+    } catch (err) {
+      console.error("Failed to generate weather advice:", err);
+    }
+  }, []);
 
   const handleSearch = useCallback(async (city: string) => {
     if (!city) return;
@@ -25,7 +45,7 @@ const App: React.FC = () => {
       setCurrentWeather(data.current);
       setForecast(data.forecast);
     } catch (err: any) {
-      setError(err.message || 'An error occurred');
+      setError(err.message || 'City not found. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -50,28 +70,29 @@ const App: React.FC = () => {
         () => {
           setError("Location access denied.");
           setLoading(false);
-          handleSearch('London'); // Default fallback
+          handleSearch('London');
         }
       );
     } else {
-      handleSearch('London'); // Default fallback
+      handleSearch('London');
     }
   }, [handleSearch]);
 
   useEffect(() => {
     handleLocationDetection();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  useEffect(() => {
+    if (currentWeather) {
+      generateAdvice(currentWeather);
+    }
+  }, [currentWeather, generateAdvice]);
 
   useEffect(() => {
     if (theme === 'dark') {
       document.documentElement.classList.add('dark');
-      document.body.classList.add('bg-slate-900', 'text-slate-100');
-      document.body.classList.remove('bg-slate-50', 'text-slate-900');
     } else {
       document.documentElement.classList.remove('dark');
-      document.body.classList.add('bg-slate-50', 'text-slate-900');
-      document.body.classList.remove('bg-slate-900', 'text-slate-100');
     }
   }, [theme]);
 
@@ -91,7 +112,7 @@ const App: React.FC = () => {
   };
 
   return (
-    <div className={`min-h-screen py-8 px-4 sm:px-6 lg:px-8 transition-colors duration-500`}>
+    <div className="min-h-screen py-8 px-4 sm:px-6 lg:px-8 transition-colors duration-500 bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-slate-100">
       <div className="max-w-5xl mx-auto">
         {/* Header Section */}
         <header className="flex flex-col md:flex-row justify-between items-center mb-10 gap-6">
@@ -105,15 +126,12 @@ const App: React.FC = () => {
           </div>
 
           <div className="flex items-center space-x-4">
-            {/* Unit Toggle */}
             <button 
               onClick={() => setUnit(unit === 'C' ? 'F' : 'C')}
               className="p-3 glass-morphism rounded-xl hover:scale-105 transition-all font-bold w-12 text-center"
             >
               °{unit}
             </button>
-            
-            {/* Dark Mode Toggle */}
             <button 
               onClick={() => setTheme(theme === 'light' ? 'dark' : 'light')}
               className="p-3 glass-morphism rounded-xl hover:scale-105 transition-all"
@@ -143,7 +161,7 @@ const App: React.FC = () => {
                 placeholder="Search city (e.g., Tokyo, London)..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                className="w-full pl-12 pr-4 py-4 rounded-2xl glass-morphism focus:outline-none focus:ring-2 focus:ring-indigo-500 shadow-xl transition-all"
+                className="w-full pl-12 pr-4 py-4 rounded-2xl glass-morphism focus:outline-none focus:ring-2 focus:ring-indigo-500 shadow-xl transition-all dark:text-white"
               />
               <svg className="absolute left-4 top-1/2 -translate-y-1/2 w-6 h-6 opacity-40" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
@@ -201,14 +219,12 @@ const App: React.FC = () => {
                       <p className="text-xl font-bold">{currentWeather.windSpeed} km/h</p>
                     </div>
                     <div className="text-center">
-                      <p className="text-sm uppercase tracking-wider opacity-60 mb-1">Feel</p>
-                      <p className="text-xl font-bold">{formatTemp(currentWeather.temperature - 2)}°</p>
+                      <p className="text-sm uppercase tracking-wider opacity-60 mb-1">Feels Like</p>
+                      <p className="text-xl font-bold">{formatTemp(currentWeather.temperature - 1)}°</p>
                     </div>
                   </div>
                 </div>
-                {/* Visual decorations */}
                 <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full blur-3xl -mr-20 -mt-20"></div>
-                <div className="absolute bottom-0 left-0 w-48 h-48 bg-white/5 rounded-full blur-2xl -ml-10 -mb-10"></div>
               </div>
             )}
 
@@ -223,7 +239,7 @@ const App: React.FC = () => {
                         {idx === 0 ? 'Today' : new Date(day.date).toLocaleDateString('en-US', { weekday: 'short' })}
                       </p>
                       <div className="mb-3 bg-white/10 p-2 rounded-xl">
-                        {React.cloneElement(WEATHER_ICONS[day.condition] as React.ReactElement, { className: 'w-8 h-8' })}
+                        {WEATHER_ICONS[day.condition]}
                       </div>
                       <p className="text-lg font-bold">{formatTemp(day.maxTemp)}°</p>
                       <p className="text-sm opacity-50">{formatTemp(day.minTemp)}°</p>
@@ -236,19 +252,25 @@ const App: React.FC = () => {
 
           {/* Sidebar / Table */}
           <div className="lg:col-span-1">
-            <WeatherTable unit={unit} onCityClick={handleSearch} />
-            <div className="mt-6 p-6 glass-morphism rounded-3xl shadow-lg border border-indigo-500/20">
-              <h4 className="font-bold text-lg mb-2 text-indigo-500">Pro Weather Tip</h4>
-              <p className="text-sm opacity-70 leading-relaxed">
-                Stay updated with SkyCast Pro. Check back regularly for high-precision real-time satellite data.
+            <div className="p-6 glass-morphism rounded-3xl shadow-lg border border-indigo-500/20 mb-8">
+              <div className="flex items-center gap-2 mb-3">
+                <span className="flex h-3 w-3 relative">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-indigo-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-3 w-3 bg-indigo-500"></span>
+                </span>
+                <h4 className="font-bold text-lg text-indigo-500">Meteorologist Tip</h4>
+              </div>
+              <p className="text-sm opacity-80 leading-relaxed italic">
+                "{weatherAdvice}"
               </p>
             </div>
+            <WeatherTable unit={unit} onCityClick={handleSearch} />
           </div>
         </main>
 
-        <footer className="mt-16 text-center opacity-40 text-sm">
+        <footer className="mt-16 text-center opacity-40 text-sm pb-8">
           <p>© {new Date().getFullYear()} SkyCast Pro. All rights reserved.</p>
-          <p className="mt-1">Powered by Open-Meteo API</p>
+          <p className="mt-1">Built with Gemini Intelligence & Open-Meteo Data</p>
         </footer>
       </div>
     </div>
