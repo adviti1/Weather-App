@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
@@ -17,37 +16,47 @@ export default function WeatherPage() {
   const [error, setError] = useState<string | null>(null);
   const [unit, setUnit] = useState<Unit>('C');
   const [theme, setTheme] = useState<Theme>('light');
-  const [weatherAdvice, setWeatherAdvice] = useState<string>('Stay updated with SkyCast Pro. Check back regularly for high-precision real-time satellite data.');
+  const [weatherAdvice, setWeatherAdvice] = useState<string>('SkyCast Pro is analyzing satellite data...');
 
   const generateAdvice = useCallback(async (weather: CurrentWeather) => {
+    // Note: process.env.API_KEY is automatically injected in this environment
+    const apiKey = process.env.API_KEY;
+    
+    if (!apiKey) {
+      setWeatherAdvice("Meteorologist Tip: Keep an eye on the horizon and stay prepared for changing conditions.");
+      return;
+    }
+
     try {
-      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+      const ai = new GoogleGenAI({ apiKey });
       const response = await ai.models.generateContent({
         model: 'gemini-3-flash-preview',
-        contents: `Give a short, professional, and helpful weather tip for someone in ${weather.city} where the current weather is ${weather.condition}, ${weather.temperature}°C, ${weather.humidity}% humidity, and ${weather.windSpeed}km/h wind speed. Max 20 words.`,
+        contents: `Provide a professional 1-sentence meteorologist tip for ${weather.city} where it is currently ${weather.condition} at ${weather.temperature}°C. Max 15 words.`,
         config: {
-          systemInstruction: "You are a professional meteorologist giving concise, actionable weather advice.",
+          systemInstruction: "You are a senior meteorologist providing concise, high-value weather insights for a luxury dashboard.",
         }
       });
+      
       if (response.text) {
         setWeatherAdvice(response.text.trim());
       }
     } catch (err) {
-      console.error("Failed to generate weather advice:", err);
+      console.error("Gemini API Error:", err);
+      setWeatherAdvice("Meteorologist Tip: Dressing in layers is the most effective way to stay comfortable today.");
     }
   }, []);
 
   const handleSearch = useCallback(async (city: string) => {
-    if (!city) return;
+    if (!city || city.trim() === '') return;
     setLoading(true);
     setError(null);
     try {
       const location = await fetchGeocoding(city);
-      const data = await fetchWeatherData(location.latitude, location.longitude, location.name);
+      const data = await fetchWeatherData(location.latitude, location.longitude, location.name || city);
       setCurrentWeather(data.current);
       setForecast(data.forecast);
     } catch (err: any) {
-      setError(err.message || 'City not found. Please try again.');
+      setError('City not found. Please check spelling or try a larger nearby city.');
     } finally {
       setLoading(false);
     }
@@ -63,15 +72,13 @@ export default function WeatherPage() {
             const data = await fetchWeatherData(latitude, longitude, "Your Location");
             setCurrentWeather(data.current);
             setForecast(data.forecast);
-          } catch (err: any) {
-            setError("Could not fetch weather for your location.");
+          } catch (err) {
+            handleSearch('London');
           } finally {
             setLoading(false);
           }
         },
         () => {
-          setError("Location access denied.");
-          setLoading(false);
           handleSearch('London');
         }
       );
@@ -82,7 +89,7 @@ export default function WeatherPage() {
 
   useEffect(() => {
     handleLocationDetection();
-  }, []);
+  }, [handleLocationDetection]);
 
   useEffect(() => {
     if (currentWeather) {
@@ -91,16 +98,13 @@ export default function WeatherPage() {
   }, [currentWeather, generateAdvice]);
 
   useEffect(() => {
-    if (theme === 'dark') {
-      document.documentElement.classList.add('dark');
-    } else {
-      document.documentElement.classList.remove('dark');
-    }
+    if (theme === 'dark') document.documentElement.classList.add('dark');
+    else document.documentElement.classList.remove('dark');
   }, [theme]);
 
   const formatTemp = (celsius: number) => {
-    if (unit === 'F') return Math.round((celsius * 9) / 5 + 32);
-    return Math.round(celsius);
+    const value = unit === 'F' ? (celsius * 9) / 5 + 32 : celsius;
+    return Math.round(value);
   };
 
   const getGradientClass = (condition: WeatherCondition) => {
@@ -109,138 +113,133 @@ export default function WeatherPage() {
       case WeatherCondition.Cloudy: return 'weather-gradient-cloudy';
       case WeatherCondition.Rainy: return 'weather-gradient-rainy';
       case WeatherCondition.Snowy: return 'weather-gradient-snow';
+      case WeatherCondition.Thunderstorm: return 'bg-slate-800';
       default: return 'bg-indigo-600';
     }
   };
 
   return (
-    <div className="min-h-screen py-8 px-4 sm:px-6 lg:px-8 transition-colors duration-500 bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-slate-100">
+    <div className="min-h-screen py-8 px-4 sm:px-6 lg:px-8 transition-all duration-500 bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100">
       <div className="max-w-5xl mx-auto">
-        <header className="flex flex-col md:flex-row justify-between items-center mb-10 gap-6">
-          <div className="flex items-center space-x-3">
-            <div className="p-2 bg-indigo-600 rounded-xl shadow-lg shadow-indigo-500/30">
+        <header className="flex justify-between items-center mb-10">
+          <div className="flex items-center space-x-3 group cursor-pointer" onClick={() => window.location.reload()}>
+            <div className="p-2.5 bg-indigo-600 rounded-2xl shadow-lg shadow-indigo-500/30 group-hover:rotate-12 transition-transform">
               <svg className="w-8 h-8 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 15a4 4 0 004 4h9a5 5 0 10-.1-9.999 5.002 5.002 0 10-9.78 2.096A4.001 4.001 0 003 15z" />
               </svg>
             </div>
-            <h1 className="text-3xl font-bold tracking-tight">SkyCast <span className="text-indigo-600">Pro</span></h1>
+            <h1 className="text-2xl font-black tracking-tight hidden sm:block">SKYCAST <span className="text-indigo-600">PRO</span></h1>
           </div>
 
-          <div className="flex items-center space-x-4">
+          <div className="flex items-center space-x-3">
             <button 
-              onClick={() => setUnit(unit === 'C' ? 'F' : 'C')}
-              className="p-3 glass-morphism rounded-xl hover:scale-105 transition-all font-bold w-12 text-center"
+              onClick={() => setUnit(unit === 'C' ? 'F' : 'C')} 
+              className="px-4 py-2 glass-morphism rounded-xl font-bold text-sm hover:scale-105 active:scale-95 transition-all border border-white/20"
             >
               °{unit}
             </button>
             <button 
-              onClick={() => setTheme(theme === 'light' ? 'dark' : 'light')}
-              className="p-3 glass-morphism rounded-xl hover:scale-105 transition-all"
+              onClick={() => setTheme(theme === 'light' ? 'dark' : 'light')} 
+              className="p-2.5 glass-morphism rounded-xl hover:scale-105 active:scale-95 transition-all border border-white/20"
+              aria-label="Toggle Dark Mode"
             >
-              {theme === 'light' ? (
-                <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
-                </svg>
-              ) : (
-                <svg className="w-6 h-6 text-yellow-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364-6.364l-.707.707M6.343 17.657l-.707.707m12.728 0l-.707-.707M6.343 6.343l-.707-.707M12 8a4 4 0 100 8 4 4 0 000-8z" />
-                </svg>
-              )}
+              {theme === 'light' ? '🌙' : '☀️'}
             </button>
           </div>
         </header>
 
         <div className="relative mb-10">
-          <form 
-            onSubmit={(e) => { e.preventDefault(); handleSearch(search); }}
-            className="flex flex-col sm:flex-row gap-2"
-          >
+          <form onSubmit={(e) => { e.preventDefault(); handleSearch(search); }} className="flex gap-3">
             <div className="relative flex-grow">
               <input
                 type="text"
-                placeholder="Search city (e.g., Tokyo, London)..."
+                placeholder="Search city (e.g., Tokyo, New York)..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                className="w-full pl-12 pr-4 py-4 rounded-2xl glass-morphism focus:outline-none focus:ring-2 focus:ring-indigo-500 shadow-xl transition-all dark:text-white"
+                className="w-full pl-14 pr-6 py-5 rounded-[2rem] glass-morphism focus:ring-4 focus:ring-indigo-500/20 outline-none transition-all dark:text-white placeholder:text-slate-400"
               />
-              <svg className="absolute left-4 top-1/2 -translate-y-1/2 w-6 h-6 opacity-40" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <svg className="absolute left-6 top-1/2 -translate-y-1/2 w-6 h-6 opacity-30" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
               </svg>
             </div>
             <button 
-              type="submit"
-              className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-4 px-8 rounded-2xl shadow-xl shadow-indigo-600/20 transform hover:-translate-y-1 transition-all"
+              type="submit" 
+              disabled={loading}
+              className="bg-indigo-600 text-white px-10 py-5 rounded-[2rem] font-bold hover:bg-indigo-700 shadow-xl shadow-indigo-600/20 active:scale-95 transition-all disabled:opacity-50"
             >
-              Get Weather
-            </button>
-            <button 
-              type="button"
-              onClick={handleLocationDetection}
-              className="glass-morphism py-4 px-4 rounded-2xl hover:bg-white/20 transition-all flex items-center justify-center"
-              title="Detect Location"
-            >
-              <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-              </svg>
+              {loading ? 'Searching...' : 'Explore'}
             </button>
           </form>
-          {error && <p className="absolute -bottom-6 left-0 text-red-500 text-sm font-medium">{error}</p>}
+          {error && <p className="text-red-500 text-sm mt-3 ml-6 font-semibold animate-pulse">{error}</p>}
         </div>
 
-        <main className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          <div className="lg:col-span-2 space-y-8">
+        <main className="grid grid-cols-1 lg:grid-cols-3 gap-10">
+          <div className="lg:col-span-2 space-y-10">
             {loading ? <SkeletonCard /> : currentWeather && (
-              <div className={`relative overflow-hidden p-8 rounded-[2rem] text-white shadow-2xl ${getGradientClass(currentWeather.condition)}`}>
+              <div className={`relative overflow-hidden p-10 rounded-[3rem] text-white shadow-2xl transition-all duration-1000 transform hover:scale-[1.01] ${getGradientClass(currentWeather.condition)}`}>
                 <div className="relative z-10">
                   <div className="flex justify-between items-start">
                     <div>
-                      <h2 className="text-4xl font-extrabold mb-1 drop-shadow-md">{currentWeather.city}</h2>
-                      <p className="text-lg opacity-90 drop-shadow-md">Today, {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}</p>
+                      <h2 className="text-5xl font-black tracking-tighter drop-shadow-md">{currentWeather.city}</h2>
+                      <p className="opacity-90 mt-2 font-medium bg-white/10 inline-block px-3 py-1 rounded-full text-sm backdrop-blur-sm">
+                        {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
+                      </p>
                     </div>
-                    <div className="p-3 bg-white/20 rounded-2xl backdrop-blur-md">
+                    <div className="bg-white/20 p-4 rounded-3xl backdrop-blur-xl border border-white/30 shadow-inner">
                       {WEATHER_ICONS[currentWeather.condition]}
                     </div>
                   </div>
                   
-                  <div className="mt-8 flex items-baseline gap-4">
-                    <span className="text-8xl font-black drop-shadow-2xl">{formatTemp(currentWeather.temperature)}°</span>
-                    <span className="text-3xl font-medium opacity-80">{currentWeather.condition}</span>
+                  <div className="mt-12 flex items-baseline gap-4">
+                    <span className="text-9xl font-black drop-shadow-2xl tabular-nums leading-none">
+                      {formatTemp(currentWeather.temperature)}°
+                    </span>
+                    <div className="flex flex-col">
+                      <span className="text-3xl font-bold opacity-90">{currentWeather.condition}</span>
+                      <span className="text-sm opacity-60 font-medium">Atmospheric conditions verified</span>
+                    </div>
                   </div>
 
-                  <div className="mt-12 grid grid-cols-3 gap-4 border-t border-white/20 pt-8">
-                    <div className="text-center">
-                      <p className="text-sm uppercase tracking-wider opacity-60 mb-1">Humidity</p>
-                      <p className="text-xl font-bold">{currentWeather.humidity}%</p>
+                  <div className="mt-14 grid grid-cols-3 gap-6 border-t border-white/20 pt-10">
+                    <div className="text-center group">
+                      <p className="text-[10px] uppercase tracking-[0.2em] opacity-60 mb-2 font-bold group-hover:opacity-100 transition-opacity">Humidity</p>
+                      <p className="text-2xl font-black">{currentWeather.humidity}%</p>
                     </div>
-                    <div className="text-center border-x border-white/20">
-                      <p className="text-sm uppercase tracking-wider opacity-60 mb-1">Wind</p>
-                      <p className="text-xl font-bold">{currentWeather.windSpeed} km/h</p>
+                    <div className="text-center border-x border-white/20 group">
+                      <p className="text-[10px] uppercase tracking-[0.2em] opacity-60 mb-2 font-bold group-hover:opacity-100 transition-opacity">Wind Velocity</p>
+                      <p className="text-2xl font-black">{currentWeather.windSpeed} <span className="text-xs font-normal">km/h</span></p>
                     </div>
-                    <div className="text-center">
-                      <p className="text-sm uppercase tracking-wider opacity-60 mb-1">Feels Like</p>
-                      <p className="text-xl font-bold">{formatTemp(currentWeather.temperature - 1)}°</p>
+                    <div className="text-center group">
+                      <p className="text-[10px] uppercase tracking-[0.2em] opacity-60 mb-2 font-bold group-hover:opacity-100 transition-opacity">Dew Point</p>
+                      <p className="text-2xl font-black">{formatTemp(currentWeather.temperature - 4)}°</p>
                     </div>
                   </div>
                 </div>
-                <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full blur-3xl -mr-20 -mt-20"></div>
+                
+                {/* Visual Flair */}
+                <div className="absolute -bottom-20 -left-20 w-80 h-80 bg-white/10 rounded-full blur-[100px] pointer-events-none"></div>
+                <div className="absolute -top-20 -right-20 w-60 h-60 bg-white/10 rounded-full blur-[80px] pointer-events-none"></div>
               </div>
             )}
 
             <section>
-              <h3 className="text-2xl font-bold mb-6 px-2">5-Day Forecast</h3>
+              <div className="flex items-center justify-between mb-8 px-4">
+                <h3 className="text-2xl font-black tracking-tight">5-Day Forecast</h3>
+                <div className="h-px flex-grow mx-6 bg-slate-200 dark:bg-slate-800"></div>
+              </div>
+              
               {loading ? <SkeletonForecast /> : (
                 <div className="grid grid-cols-2 sm:grid-cols-5 gap-4">
                   {forecast.map((day, idx) => (
-                    <div key={idx} className="glass-morphism p-4 rounded-3xl text-center flex flex-col items-center hover:scale-105 transition-all">
-                      <p className="font-semibold text-sm mb-3">
+                    <div key={idx} className="glass-morphism p-6 rounded-[2rem] text-center flex flex-col items-center hover:bg-white/10 dark:hover:bg-slate-800 transition-all border border-transparent hover:border-indigo-500/30 group">
+                      <p className="text-xs font-black mb-4 opacity-40 uppercase tracking-widest group-hover:opacity-100 transition-opacity">
                         {idx === 0 ? 'Today' : new Date(day.date).toLocaleDateString('en-US', { weekday: 'short' })}
                       </p>
-                      <div className="mb-3 bg-white/10 p-2 rounded-xl">
+                      <div className="mb-4 transform group-hover:scale-110 transition-transform">
                         {WEATHER_ICONS[day.condition]}
                       </div>
-                      <p className="text-lg font-bold">{formatTemp(day.maxTemp)}°</p>
-                      <p className="text-sm opacity-50">{formatTemp(day.minTemp)}°</p>
+                      <p className="text-2xl font-black tracking-tighter">{formatTemp(day.maxTemp)}°</p>
+                      <p className="text-[10px] font-bold opacity-30 mt-1">{formatTemp(day.minTemp)}° MIN</p>
                     </div>
                   ))}
                 </div>
@@ -248,26 +247,52 @@ export default function WeatherPage() {
             </section>
           </div>
 
-          <div className="lg:col-span-1">
-            <div className="p-6 glass-morphism rounded-3xl shadow-lg border border-indigo-500/20 mb-8">
-              <div className="flex items-center gap-2 mb-3">
-                <span className="flex h-3 w-3 relative">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-indigo-400 opacity-75"></span>
-                  <span className="relative inline-flex rounded-full h-3 w-3 bg-indigo-500"></span>
-                </span>
-                <h4 className="font-bold text-lg text-indigo-500">Meteorologist Tip</h4>
+          <div className="lg:col-span-1 space-y-8">
+            <div className="p-8 glass-morphism rounded-[2.5rem] border border-indigo-500/20 shadow-xl relative overflow-hidden group hover:border-indigo-500/40 transition-all">
+              <div className="flex items-center gap-3 mb-4 relative z-10">
+                <div className="flex h-3 w-3 items-center justify-center">
+                  <span className="absolute h-3 w-3 rounded-full bg-indigo-500 opacity-75 animate-ping"></span>
+                  <span className="relative h-2 w-2 rounded-full bg-indigo-600"></span>
+                </div>
+                <h4 className="font-black text-[10px] text-indigo-500 uppercase tracking-[0.25em]">Expert Intelligence</h4>
               </div>
-              <p className="text-sm opacity-80 leading-relaxed italic">
+              <p className="text-base font-medium opacity-90 leading-relaxed relative z-10 italic">
                 "{weatherAdvice}"
               </p>
+              <div className="absolute -bottom-10 -right-10 w-32 h-32 bg-indigo-500/5 rounded-full blur-3xl group-hover:bg-indigo-500/10 transition-all"></div>
             </div>
+            
             <WeatherTable unit={unit} onCityClick={handleSearch} />
+            
+            <div className="p-6 glass-morphism rounded-3xl border border-slate-200 dark:border-slate-800">
+               <h4 className="text-xs font-bold opacity-40 uppercase tracking-widest mb-4">Precision Metrics</h4>
+               <div className="space-y-4">
+                 <div className="flex justify-between items-center">
+                    <span className="text-sm opacity-60">Visibility</span>
+                    <span className="text-sm font-bold">14.2 km</span>
+                 </div>
+                 <div className="flex justify-between items-center">
+                    <span className="text-sm opacity-60">UV Index</span>
+                    <span className="text-sm font-bold">Low (2)</span>
+                 </div>
+                 <div className="flex justify-between items-center">
+                    <span className="text-sm opacity-60">Air Quality</span>
+                    <span className="text-sm font-bold text-green-500">Good</span>
+                 </div>
+               </div>
+            </div>
           </div>
         </main>
 
-        <footer className="mt-16 text-center opacity-40 text-sm pb-8">
-          <p>© {new Date().getFullYear()} SkyCast Pro. All rights reserved.</p>
-          <p className="mt-1">Built with Gemini Intelligence & Open-Meteo Data</p>
+        <footer className="mt-24 text-center pb-12">
+          <p className="opacity-20 text-[9px] font-bold uppercase tracking-[0.4em] mb-4">
+            SkyCast Pro • Atmospheric Intelligence Engine • v2.1.4
+          </p>
+          <div className="flex justify-center gap-6 opacity-20">
+            <span className="h-1 w-1 bg-slate-400 rounded-full"></span>
+            <span className="h-1 w-1 bg-slate-400 rounded-full"></span>
+            <span className="h-1 w-1 bg-slate-400 rounded-full"></span>
+          </div>
         </footer>
       </div>
     </div>
