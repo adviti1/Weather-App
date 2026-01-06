@@ -8,6 +8,9 @@ import { SkeletonCard, SkeletonForecast } from '../components/SkeletonLoader';
 import WeatherTable from '../components/WeatherTable';
 import { GoogleGenAI } from "@google/genai";
 
+// We assume aistudio and AIStudio are globally defined by the environment as per the execution context instructions.
+// We use (window as any) to bypass local TypeScript environment conflicts while maintaining functionality.
+
 export default function WeatherPage() {
   const [search, setSearch] = useState('');
   const [currentWeather, setCurrentWeather] = useState<CurrentWeather | null>(null);
@@ -16,19 +19,45 @@ export default function WeatherPage() {
   const [error, setError] = useState<string | null>(null);
   const [unit, setUnit] = useState<Unit>('C');
   const [theme, setTheme] = useState<Theme>('light');
-  const [weatherAdvice, setWeatherAdvice] = useState<string>('SkyCast Pro is analyzing satellite data...');
+  const [weatherAdvice, setWeatherAdvice] = useState<string>('');
+  const [isApiKeyMissing, setIsApiKeyMissing] = useState(false);
+
+  // handleOpenKeyPicker opens the key selection dialog and assumes success to mitigate race conditions
+  const handleOpenKeyPicker = useCallback(async () => {
+    const win = window as any;
+    if (typeof window !== 'undefined' && win.aistudio) {
+      await win.aistudio.openSelectKey();
+      // Assume success and re-trigger advice generation
+      if (currentWeather) {
+        generateAdvice(currentWeather);
+      }
+    }
+  }, [currentWeather]);
 
   const generateAdvice = useCallback(async (weather: CurrentWeather) => {
-    // Note: process.env.API_KEY is automatically injected in this environment
+    // Priority 1: Use window.aistudio to check if user has a key
+    let hasKey = false;
+    const win = window as any;
+    if (typeof window !== 'undefined' && win.aistudio) {
+      hasKey = await win.aistudio.hasSelectedApiKey();
+    }
+
+    // Use process.env.API_KEY directly as per guidelines
     const apiKey = process.env.API_KEY;
     
-    if (!apiKey) {
-      setWeatherAdvice("Meteorologist Tip: Keep an eye on the horizon and stay prepared for changing conditions.");
+    // If no key is found from environment or user selection
+    if (!apiKey && !hasKey) {
+      setIsApiKeyMissing(true);
+      setWeatherAdvice("Connect your API key for personalized meteorological insights.");
       return;
     }
 
+    setIsApiKeyMissing(false);
+    setWeatherAdvice("SkyCast AI is generating your tip...");
+
     try {
-      const ai = new GoogleGenAI({ apiKey });
+      // Create a new instance right before making the call to ensure the latest API key is used
+      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
       const response = await ai.models.generateContent({
         model: 'gemini-3-flash-preview',
         contents: `Provide a professional 1-sentence meteorologist tip for ${weather.city} where it is currently ${weather.condition} at ${weather.temperature}°C. Max 15 words.`,
@@ -40,9 +69,21 @@ export default function WeatherPage() {
       if (response.text) {
         setWeatherAdvice(response.text.trim());
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error("Gemini API Error:", err);
-      setWeatherAdvice("Meteorologist Tip: Dressing in layers is the most effective way to stay comfortable today.");
+      
+      // If the request fails with "Requested entity was not found.", reset the state and prompt for a key
+      if (err?.message?.includes("Requested entity was not found.")) {
+        setIsApiKeyMissing(true);
+        setWeatherAdvice("Connection failed. Please re-select your Gemini API key.");
+        // Prompt the user to select a key again
+        if (typeof window !== 'undefined' && win.aistudio) {
+           win.aistudio.openSelectKey();
+        }
+      } else {
+        // Fallback for quota or other errors
+        setWeatherAdvice("Meteorologist Tip: Keep an eye on local radar for real-time adjustments to your plans.");
+      }
     }
   }, []);
 
@@ -124,11 +165,11 @@ export default function WeatherPage() {
         <header className="flex justify-between items-center mb-10">
           <div className="flex items-center space-x-3 group cursor-pointer" onClick={() => window.location.reload()}>
             <div className="p-2.5 bg-indigo-600 rounded-2xl shadow-lg shadow-indigo-500/30 group-hover:rotate-12 transition-transform">
-              <svg className="w-8 h-8 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <svg width="32" height="32" className="w-8 h-8 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 15a4 4 0 004 4h9a5 5 0 10-.1-9.999 5.002 5.002 0 10-9.78 2.096A4.001 4.001 0 003 15z" />
               </svg>
             </div>
-            <h1 className="text-2xl font-black tracking-tight hidden sm:block">SKYCAST <span className="text-indigo-600">PRO</span></h1>
+            <h1 className="text-2xl font-black tracking-tight hidden sm:block uppercase">SkyCast <span className="text-indigo-600">Pro</span></h1>
           </div>
 
           <div className="flex items-center space-x-3">
@@ -149,25 +190,25 @@ export default function WeatherPage() {
         </header>
 
         <div className="relative mb-10">
-          <form onSubmit={(e) => { e.preventDefault(); handleSearch(search); }} className="flex gap-3">
+          <form onSubmit={(e) => { e.preventDefault(); handleSearch(search); }} className="flex flex-col sm:flex-row gap-3">
             <div className="relative flex-grow">
               <input
                 type="text"
                 placeholder="Search city (e.g., Tokyo, New York)..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                className="w-full pl-14 pr-6 py-5 rounded-[2rem] glass-morphism focus:ring-4 focus:ring-indigo-500/20 outline-none transition-all dark:text-white placeholder:text-slate-400"
+                className="w-full pl-14 pr-6 py-5 rounded-[2rem] glass-morphism focus:ring-4 focus:ring-indigo-500/20 outline-none transition-all dark:text-white placeholder:text-slate-400 border border-transparent focus:border-indigo-500/30"
               />
-              <svg className="absolute left-6 top-1/2 -translate-y-1/2 w-6 h-6 opacity-30" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <svg width="24" height="24" className="absolute left-6 top-1/2 -translate-y-1/2 w-6 h-6 opacity-30" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
               </svg>
             </div>
             <button 
               type="submit" 
               disabled={loading}
-              className="bg-indigo-600 text-white px-10 py-5 rounded-[2rem] font-bold hover:bg-indigo-700 shadow-xl shadow-indigo-600/20 active:scale-95 transition-all disabled:opacity-50"
+              className="bg-indigo-600 text-white px-10 py-5 rounded-[2rem] font-bold hover:bg-indigo-700 shadow-xl shadow-indigo-600/20 active:scale-95 transition-all disabled:opacity-50 whitespace-nowrap"
             >
-              {loading ? 'Searching...' : 'Explore'}
+              {loading ? 'Analyzing...' : 'Explore Weather'}
             </button>
           </form>
           {error && <p className="text-red-500 text-sm mt-3 ml-6 font-semibold animate-pulse">{error}</p>}
@@ -196,7 +237,7 @@ export default function WeatherPage() {
                     </span>
                     <div className="flex flex-col">
                       <span className="text-3xl font-bold opacity-90">{currentWeather.condition}</span>
-                      <span className="text-sm opacity-60 font-medium">Atmospheric conditions verified</span>
+                      <span className="text-sm opacity-60 font-medium tracking-tight">Real-time Telemetry Active</span>
                     </div>
                   </div>
 
@@ -210,8 +251,8 @@ export default function WeatherPage() {
                       <p className="text-2xl font-black">{currentWeather.windSpeed} <span className="text-xs font-normal">km/h</span></p>
                     </div>
                     <div className="text-center group">
-                      <p className="text-[10px] uppercase tracking-[0.2em] opacity-60 mb-2 font-bold group-hover:opacity-100 transition-opacity">Dew Point</p>
-                      <p className="text-2xl font-black">{formatTemp(currentWeather.temperature - 4)}°</p>
+                      <p className="text-[10px] uppercase tracking-[0.2em] opacity-60 mb-2 font-bold group-hover:opacity-100 transition-opacity">Visibility</p>
+                      <p className="text-2xl font-black">14 <span className="text-xs font-normal">km</span></p>
                     </div>
                   </div>
                 </div>
@@ -224,14 +265,14 @@ export default function WeatherPage() {
 
             <section>
               <div className="flex items-center justify-between mb-8 px-4">
-                <h3 className="text-2xl font-black tracking-tight">5-Day Forecast</h3>
+                <h3 className="text-2xl font-black tracking-tight">5-Day Outlook</h3>
                 <div className="h-px flex-grow mx-6 bg-slate-200 dark:bg-slate-800"></div>
               </div>
               
               {loading ? <SkeletonForecast /> : (
-                <div className="grid grid-cols-2 sm:grid-cols-5 gap-4">
+                <div className="grid grid-cols-2 sm:grid-cols-5 gap-4 overflow-x-auto pb-4 hide-scrollbar">
                   {forecast.map((day, idx) => (
-                    <div key={idx} className="glass-morphism p-6 rounded-[2rem] text-center flex flex-col items-center hover:bg-white/10 dark:hover:bg-slate-800 transition-all border border-transparent hover:border-indigo-500/30 group">
+                    <div key={idx} className="glass-morphism p-6 rounded-[2rem] text-center flex flex-col items-center hover:bg-white/10 dark:hover:bg-slate-800 transition-all border border-transparent hover:border-indigo-500/30 group min-w-[120px]">
                       <p className="text-xs font-black mb-4 opacity-40 uppercase tracking-widest group-hover:opacity-100 transition-opacity">
                         {idx === 0 ? 'Today' : new Date(day.date).toLocaleDateString('en-US', { weekday: 'short' })}
                       </p>
@@ -239,7 +280,7 @@ export default function WeatherPage() {
                         {WEATHER_ICONS[day.condition]}
                       </div>
                       <p className="text-2xl font-black tracking-tighter">{formatTemp(day.maxTemp)}°</p>
-                      <p className="text-[10px] font-bold opacity-30 mt-1">{formatTemp(day.minTemp)}° MIN</p>
+                      <p className="text-[10px] font-bold opacity-30 mt-1">{formatTemp(day.minTemp)}° LOW</p>
                     </div>
                   ))}
                 </div>
@@ -251,25 +292,46 @@ export default function WeatherPage() {
             <div className="p-8 glass-morphism rounded-[2.5rem] border border-indigo-500/20 shadow-xl relative overflow-hidden group hover:border-indigo-500/40 transition-all">
               <div className="flex items-center gap-3 mb-4 relative z-10">
                 <div className="flex h-3 w-3 items-center justify-center">
-                  <span className="absolute h-3 w-3 rounded-full bg-indigo-500 opacity-75 animate-ping"></span>
+                  <span className={`absolute h-3 w-3 rounded-full bg-indigo-500 opacity-75 ${isApiKeyMissing ? '' : 'animate-ping'}`}></span>
                   <span className="relative h-2 w-2 rounded-full bg-indigo-600"></span>
                 </div>
                 <h4 className="font-black text-[10px] text-indigo-500 uppercase tracking-[0.25em]">Expert Intelligence</h4>
               </div>
-              <p className="text-base font-medium opacity-90 leading-relaxed relative z-10 italic">
+              
+              <p className="text-base font-medium opacity-90 leading-relaxed relative z-10 italic mb-4">
                 "{weatherAdvice}"
               </p>
+
+              {isApiKeyMissing && (
+                <div className="relative z-10 mt-4 space-y-3">
+                  <button 
+                    onClick={handleOpenKeyPicker}
+                    className="w-full bg-indigo-600 text-white py-3 rounded-2xl font-bold text-sm hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-600/20"
+                  >
+                    Connect Gemini Key
+                  </button>
+                  <a 
+                    href="https://ai.google.dev/gemini-api/docs/billing" 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    className="block text-center text-[10px] font-bold opacity-40 hover:opacity-100 transition-opacity uppercase tracking-widest"
+                  >
+                    Gemini Billing Documentation
+                  </a>
+                </div>
+              )}
+              
               <div className="absolute -bottom-10 -right-10 w-32 h-32 bg-indigo-500/5 rounded-full blur-3xl group-hover:bg-indigo-500/10 transition-all"></div>
             </div>
             
             <WeatherTable unit={unit} onCityClick={handleSearch} />
             
             <div className="p-6 glass-morphism rounded-3xl border border-slate-200 dark:border-slate-800">
-               <h4 className="text-xs font-bold opacity-40 uppercase tracking-widest mb-4">Precision Metrics</h4>
+               <h4 className="text-xs font-bold opacity-40 uppercase tracking-widest mb-4">Atmospheric Metrics</h4>
                <div className="space-y-4">
                  <div className="flex justify-between items-center">
-                    <span className="text-sm opacity-60">Visibility</span>
-                    <span className="text-sm font-bold">14.2 km</span>
+                    <span className="text-sm opacity-60">Barometer</span>
+                    <span className="text-sm font-bold">1012 hPa</span>
                  </div>
                  <div className="flex justify-between items-center">
                     <span className="text-sm opacity-60">UV Index</span>
@@ -277,22 +339,20 @@ export default function WeatherPage() {
                  </div>
                  <div className="flex justify-between items-center">
                     <span className="text-sm opacity-60">Air Quality</span>
-                    <span className="text-sm font-bold text-green-500">Good</span>
+                    <span className="text-sm font-bold text-green-500">Optimum</span>
                  </div>
                </div>
             </div>
           </div>
         </main>
 
-        <footer className="mt-24 text-center pb-12">
+        <footer className="mt-24 text-center pb-12 border-t border-slate-200 dark:border-slate-800 pt-12">
           <p className="opacity-20 text-[9px] font-bold uppercase tracking-[0.4em] mb-4">
-            SkyCast Pro • Atmospheric Intelligence Engine • v2.1.4
+            SkyCast Pro • Satellite Intelligence Engine • v2.1.8
           </p>
-          <div className="flex justify-center gap-6 opacity-20">
-            <span className="h-1 w-1 bg-slate-400 rounded-full"></span>
-            <span className="h-1 w-1 bg-slate-400 rounded-full"></span>
-            <span className="h-1 w-1 bg-slate-400 rounded-full"></span>
-          </div>
+          <p className="text-[10px] opacity-20 font-medium">
+            Powered by Open-Meteo & Gemini AI Systems
+          </p>
         </footer>
       </div>
     </div>

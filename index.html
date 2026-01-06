@@ -5,10 +5,25 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>SkyCast Pro - Precision Weather Dashboard</title>
     <style>
-      /* Fallback to prevent giant icons before JS loads */
-      svg { max-width: 100%; height: auto; display: block; }
-      .w-12 { width: 3rem !important; }
+      /* Prevent the "Giant Icon" bug shown in screenshots */
+      svg { 
+        max-width: 100%; 
+        height: auto; 
+        display: inline-block; 
+      }
+      /* Hard-coded constraints as a safety net */
+      .w-8 { width: 2rem !important; height: 2rem !important; }
+      .h-8 { height: 2rem !important; }
+      .w-12 { width: 3rem !important; height: 3rem !important; }
       .h-12 { height: 3rem !important; }
+      .w-6 { width: 1.5rem !important; height: 1.5rem !important; }
+      .h-6 { height: 1.5rem !important; }
+
+      body {
+        margin: 0;
+        padding: 0;
+        overflow-x: hidden;
+      }
     </style>
     <script type="importmap">
     {
