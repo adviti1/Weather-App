@@ -2,6 +2,12 @@
   Styles moved to index.html for direct browser-based rendering support.
   This file is kept minimal for compatibility with standard Next.js layouts.
 */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Your custom styles */
+
 body {
   margin: 0;
   padding: 0;
