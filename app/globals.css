@@ -1,44 +1,10 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
-
-@layer base {
-  body {
-    @apply antialiased text-slate-900 bg-slate-50 transition-colors duration-500;
-  }
-}
-
-@layer components {
-  .glass-morphism {
-    @apply bg-white/10 backdrop-blur-md border border-white/20;
-  }
-  
-  .dark .glass-morphism {
-    @apply bg-black/30 border-white/10;
-  }
-
-  .weather-gradient-clear {
-    @apply bg-gradient-to-b from-[#4facfe] to-[#00f2fe];
-  }
-
-  .weather-gradient-cloudy {
-    @apply bg-gradient-to-b from-[#8989ba] to-[#a7a6cb];
-  }
-
-  .weather-gradient-rainy {
-    @apply bg-gradient-to-b from-[#373b44] to-[#4286f4];
-  }
-
-  .weather-gradient-snow {
-    @apply bg-gradient-to-b from-[#e6e9f0] to-[#eef1f5];
-  }
-
-  /* Custom Scrollbar for Forecast */
-  .hide-scrollbar::-webkit-scrollbar {
-    display: none;
-  }
-  .hide-scrollbar {
-    -ms-overflow-style: none;
-    scrollbar-width: none;
-  }
+/* 
+  Styles moved to index.html for direct browser-based rendering support.
+  This file is kept minimal for compatibility with standard Next.js layouts.
+*/
+body {
+  margin: 0;
+  padding: 0;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }

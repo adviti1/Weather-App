@@ -8,9 +8,6 @@ import { SkeletonCard, SkeletonForecast } from '../components/SkeletonLoader';
 import WeatherTable from '../components/WeatherTable';
 import { GoogleGenAI } from "@google/genai";
 
-// We assume aistudio and AIStudio are globally defined by the environment as per the execution context instructions.
-// We use (window as any) to bypass local TypeScript environment conflicts while maintaining functionality.
-
 export default function WeatherPage() {
   const [search, setSearch] = useState('');
   const [currentWeather, setCurrentWeather] = useState<CurrentWeather | null>(null);
@@ -22,33 +19,40 @@ export default function WeatherPage() {
   const [weatherAdvice, setWeatherAdvice] = useState<string>('');
   const [isApiKeyMissing, setIsApiKeyMissing] = useState(false);
 
-  // handleOpenKeyPicker opens the key selection dialog and assumes success to mitigate race conditions
   const handleOpenKeyPicker = useCallback(async () => {
     const win = window as any;
     if (typeof window !== 'undefined' && win.aistudio) {
       await win.aistudio.openSelectKey();
-      // Assume success and re-trigger advice generation
+      // Reset state and attempt to generate advice again
+      setIsApiKeyMissing(false);
       if (currentWeather) {
-        generateAdvice(currentWeather);
+        setTimeout(() => generateAdvice(currentWeather), 500);
       }
     }
   }, [currentWeather]);
 
   const generateAdvice = useCallback(async (weather: CurrentWeather) => {
-    // Priority 1: Use window.aistudio to check if user has a key
-    let hasKey = false;
     const win = window as any;
+    const apiKey = process.env.API_KEY;
+
+    // Check if key is available in process.env or via aistudio helper
+    const hasInternalKey = !!apiKey && apiKey !== '';
+    let hasSelectedKey = false;
+    
     if (typeof window !== 'undefined' && win.aistudio) {
-      hasKey = await win.aistudio.hasSelectedApiKey();
+      hasSelectedKey = await win.aistudio.hasSelectedApiKey();
     }
 
-    // Use process.env.API_KEY directly as per guidelines
-    const apiKey = process.env.API_KEY;
-    
-    // If no key is found from environment or user selection
-    if (!apiKey && !hasKey) {
+    if (!hasInternalKey && !hasSelectedKey) {
       setIsApiKeyMissing(true);
       setWeatherAdvice("Connect your API key for personalized meteorological insights.");
+      return;
+    }
+
+    // Even if hasSelectedKey is true, process.env.API_KEY might still be empty for a split second
+    if (!apiKey) {
+      setIsApiKeyMissing(true);
+      setWeatherAdvice("Finalizing connection to Gemini AI...");
       return;
     }
 
@@ -56,8 +60,7 @@ export default function WeatherPage() {
     setWeatherAdvice("SkyCast AI is generating your tip...");
 
     try {
-      // Create a new instance right before making the call to ensure the latest API key is used
-      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+      const ai = new GoogleGenAI({ apiKey: apiKey });
       const response = await ai.models.generateContent({
         model: 'gemini-3-flash-preview',
         contents: `Provide a professional 1-sentence meteorologist tip for ${weather.city} where it is currently ${weather.condition} at ${weather.temperature}°C. Max 15 words.`,
@@ -71,18 +74,11 @@ export default function WeatherPage() {
       }
     } catch (err: any) {
       console.error("Gemini API Error:", err);
-      
-      // If the request fails with "Requested entity was not found.", reset the state and prompt for a key
-      if (err?.message?.includes("Requested entity was not found.")) {
+      if (err?.message?.includes("API Key") || err?.message?.includes("Requested entity was not found")) {
         setIsApiKeyMissing(true);
-        setWeatherAdvice("Connection failed. Please re-select your Gemini API key.");
-        // Prompt the user to select a key again
-        if (typeof window !== 'undefined' && win.aistudio) {
-           win.aistudio.openSelectKey();
-        }
+        setWeatherAdvice("Please re-select your Gemini API key.");
       } else {
-        // Fallback for quota or other errors
-        setWeatherAdvice("Meteorologist Tip: Keep an eye on local radar for real-time adjustments to your plans.");
+        setWeatherAdvice("Meteorologist Tip: Dress in breathable layers for maximum comfort today.");
       }
     }
   }, []);

@@ -5,24 +5,37 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>SkyCast Pro - Precision Weather Dashboard</title>
     <style>
-      /* Prevent the "Giant Icon" bug shown in screenshots */
+      /* CRITICAL: Prevent "Giant Icon" bug before Tailwind/JS loads */
       svg { 
-        max-width: 100%; 
-        height: auto; 
+        max-width: 100% !important; 
+        height: auto !important; 
         display: inline-block; 
       }
-      /* Hard-coded constraints as a safety net */
-      .w-8 { width: 2rem !important; height: 2rem !important; }
-      .h-8 { height: 2rem !important; }
-      .w-12 { width: 3rem !important; height: 3rem !important; }
-      .h-12 { height: 3rem !important; }
-      .w-6 { width: 1.5rem !important; height: 1.5rem !important; }
-      .h-6 { height: 1.5rem !important; }
+      .w-8, .h-8 { width: 2rem !important; height: 2rem !important; }
+      .w-12, .h-12 { width: 3rem !important; height: 3rem !important; }
+      .w-6, .h-6 { width: 1.5rem !important; height: 1.5rem !important; }
 
+      /* Base App Styles */
+      .glass-morphism {
+        background: rgba(255, 255, 255, 0.05);
+        backdrop-filter: blur(12px);
+        -webkit-backdrop-filter: blur(12px);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+      }
+      .dark .glass-morphism {
+        background: rgba(0, 0, 0, 0.2);
+        border: 1px solid rgba(255, 255, 255, 0.05);
+      }
+      .weather-gradient-clear { background: linear-gradient(to bottom, #4facfe, #00f2fe); }
+      .weather-gradient-cloudy { background: linear-gradient(to bottom, #8989ba, #a7a6cb); }
+      .weather-gradient-rainy { background: linear-gradient(to bottom, #373b44, #4286f4); }
+      .weather-gradient-snow { background: linear-gradient(to bottom, #e6e9f0, #eef1f5); }
+      
       body {
         margin: 0;
         padding: 0;
         overflow-x: hidden;
+        font-family: 'Inter', system-ui, -apple-system, sans-serif;
       }
     </style>
     <script type="importmap">
@@ -52,7 +65,7 @@
       }
     </script>
 </head>
-<body class="bg-slate-50 dark:bg-slate-950">
+<body class="bg-slate-50 dark:bg-slate-950 transition-colors duration-500">
     <div id="root"></div>
     <script type="module" src="index.tsx"></script>
 </body>
