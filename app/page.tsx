@@ -298,25 +298,6 @@ export default function WeatherPage() {
                 "{weatherAdvice}"
               </p>
 
-              {isApiKeyMissing && (
-                <div className="relative z-10 mt-4 space-y-3">
-                  <button 
-                    onClick={handleOpenKeyPicker}
-                    className="w-full bg-indigo-600 text-white py-3 rounded-2xl font-bold text-sm hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-600/20"
-                  >
-                    Connect Gemini Key
-                  </button>
-                  <a 
-                    href="https://ai.google.dev/gemini-api/docs/billing" 
-                    target="_blank" 
-                    rel="noopener noreferrer"
-                    className="block text-center text-[10px] font-bold opacity-40 hover:opacity-100 transition-opacity uppercase tracking-widest"
-                  >
-                    Gemini Billing Documentation
-                  </a>
-                </div>
-              )}
-              
               <div className="absolute -bottom-10 -right-10 w-32 h-32 bg-indigo-500/5 rounded-full blur-3xl group-hover:bg-indigo-500/10 transition-all"></div>
             </div>
             

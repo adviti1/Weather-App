@@ -14,3 +14,20 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
+
+/* Weather Gradient Backgrounds */
+.weather-gradient-clear {
+  @apply bg-gradient-to-br from-blue-400 via-blue-500 to-cyan-600;
+}
+
+.weather-gradient-cloudy {
+  @apply bg-gradient-to-br from-slate-400 via-slate-500 to-slate-700;
+}
+
+.weather-gradient-rainy {
+  @apply bg-gradient-to-br from-blue-700 via-slate-600 to-slate-800;
+}
+
+.weather-gradient-snow {
+  @apply bg-gradient-to-br from-blue-200 via-slate-300 to-blue-400;
+}
