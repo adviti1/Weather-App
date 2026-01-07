@@ -342,14 +342,6 @@ export default function WeatherPage() {
           </div>
         </main>
 
-        <footer className="mt-24 text-center pb-12 border-t border-slate-200 dark:border-slate-800 pt-12">
-          <p className="opacity-20 text-[9px] font-bold uppercase tracking-[0.4em] mb-4">
-            SkyCast Pro • Satellite Intelligence Engine • v2.1.8
-          </p>
-          <p className="text-[10px] opacity-20 font-medium">
-            Powered by Open-Meteo & Gemini AI Systems
-          </p>
-        </footer>
       </div>
     </div>
   );
